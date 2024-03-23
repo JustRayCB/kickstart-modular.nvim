@@ -5,6 +5,14 @@
 --
 --]]
 
+local health = {
+  start = vim.health.start or vim.health.report_start,
+  ok = vim.health.ok or vim.health.report_ok,
+  warn = vim.health.warn or vim.health.report_warn,
+  error = vim.health.error or vim.health.report_error,
+  info = vim.health.info or vim.health.report_info,
+}
+
 local check_version = function()
   local verstr = string.format('%s.%s.%s', vim.version().major, vim.version().minor, vim.version().patch)
   if not vim.version.cmp then
@@ -19,14 +27,47 @@ local check_version = function()
   end
 end
 
+local programs = {
+  {
+    cmd = { 'git' },
+    type = 'error',
+    msg = 'Used for core functionality such as updater and plugin management',
+  },
+  {
+    cmd = { 'xdg-open', 'rundll32', 'wslview', 'open' },
+    type = 'warn',
+    msg = 'Used for `gx` mapping for opening files with system opener (Optional)',
+  },
+  { cmd = { 'lazygit' }, type = 'warn', msg = 'Used for mappings to pull up git TUI (Optional)' },
+  { cmd = { 'node' }, type = 'warn', msg = 'Used for mappings to pull up node REPL (Optional)' },
+  {
+    cmd = { vim.fn.has 'mac' == 1 and 'gdu-go' or 'gdu' },
+    type = 'warn',
+    msg = 'Used for mappings to pull up disk usage analyzer (Optional)',
+  },
+  { cmd = { 'btm' }, type = 'warn', msg = 'Used for mappings to pull up system monitor (Optional)' },
+  { cmd = { 'python', 'python3' }, type = 'warn', msg = 'Used for mappings to pull up python REPL (Optional)' },
+}
+
 local check_external_reqs = function()
   -- Basic utils: `git`, `make`, `unzip`
-  for _, exe in ipairs { 'git', 'make', 'unzip', 'rg' } do
-    local is_executable = vim.fn.executable(exe) == 1
-    if is_executable then
-      vim.health.ok(string.format("Found executable: '%s'", exe))
+  for _, program in ipairs(programs) do
+    local name = table.concat(program.cmd, '/')
+    local found = false
+    for _, cmd in ipairs(program.cmd) do
+      if vim.fn.executable(cmd) == 1 then
+        name = cmd
+        if not program.extra_check or program.extra_check(program) then
+          found = true
+        end
+        break
+      end
+    end
+
+    if found then
+      health.ok(('`%s` is installed: %s'):format(name, program.msg))
     else
-      vim.health.warn(string.format("Could not find executable: '%s'", exe))
+      health[program.type](('`%s` is not installed: %s'):format(name, program.msg))
     end
   end
 
